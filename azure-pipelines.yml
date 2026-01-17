@@ -35,7 +35,7 @@ stages:
       displayName: Run Tests
 
 - stage: Quality
-  displayName: Code Quality - SonarCloud
+  displayName: Code Quality - SonarCloud (CLI)
   dependsOn: Tests
   jobs:
   - job: Sonar
@@ -43,23 +43,40 @@ stages:
     pool:
       vmImage: $(vmImage)
     steps:
-    - task: SonarCloudPrepare@1
-      displayName: Prepare SonarCloud
-      inputs:
-        SonarCloud: SonarCloudServiceConnection
-        organization: sua-org
-        scannerMode: CLI
-        configMode: manual
-        cliProjectKey: devops-case
-        cliProjectName: devops-case
+    - checkout: self
 
-    - task: SonarCloudAnalyze@1
+    - script: |
+        set -e
+        echo "Installing Java..."
+        sudo apt-get update
+        sudo apt-get install -y openjdk-17-jre unzip
+        java -version
+
+        echo "Downloading SonarScanner..."
+        curl -sSLo sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+        unzip -q sonar-scanner.zip
+        export PATH="$PWD/sonar-scanner-5.0.1.3006-linux/bin:$PATH"
+
+        echo "Running SonarScanner..."
+        sonar-scanner \
+          -Dsonar.host.url=https://sonarcloud.io \
+          -Dsonar.organization=SEU_ORG_SONARCLOUD \
+          -Dsonar.projectKey=SEU_PROJECT_KEY \
+          -Dsonar.projectName=SEU_PROJECT_NAME \
+          -Dsonar.sources=.
+      displayName: Run SonarScanner (SonarCloud)
+      env:
+        SONAR_TOKEN: $(SONAR_TOKEN)
+
+
+    - task: SonarCloudAnalyze@2
       displayName: Run SonarCloud Analysis
 
-    - task: SonarCloudPublish@1
+    - task: SonarCloudPublish@2
       displayName: Publish Quality Gate Result
       inputs:
         pollingTimeoutSec: "300"
+
 
 - stage: Security
   displayName: Security - DAST
