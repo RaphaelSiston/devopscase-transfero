@@ -1,4 +1,19 @@
-resources:
-  limits:
-    cpu: "4"
-    memory: "8Gi"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: devops-case
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: devops-case
+  template:
+    metadata:
+      labels:
+        app: devops-case
+    spec:
+      containers:
+      - name: app
+        image: nginx:latest
+        ports:
+        - containerPort: 80
