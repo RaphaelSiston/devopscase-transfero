@@ -41,7 +41,7 @@ stages:
   - job: Sonar
     displayName: SonarCloud Analysis
     pool:
-      name: 'self-hosted'
+      vmImage: ubuntu-latest   # <<< ALTERAÇÃO AQUI (Opção A)
     steps:
     - checkout: self
 
