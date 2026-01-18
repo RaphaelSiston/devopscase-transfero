@@ -120,31 +120,39 @@ stages:
       displayName: Publish DAST Report
 
 - stage: Deploy_Staging
-  displayName: Deploy Staging (Dry Run)
+  displayName: Deploy Staging (Offline Validate)
   dependsOn: Security
   jobs:
     - job: DeployStaging
-      displayName: Validate Kubernetes Manifests
+      displayName: Validate Kubernetes Manifests (kubeconform)
       pool:
         name: 'self-hosted'
       steps:
+        - checkout: self
+
         - powershell: |
-            Write-Host "Validating Kubernetes manifests (pure client-side)"
+            Write-Host "Validating Kubernetes manifests OFFLINE with kubeconform (no cluster needed)"
+            Write-Host "Sources: $(Build.SourcesDirectory)"
 
-            kubectl version --client
+            
+            docker pull ghcr.io/yannh/kubeconform:latest
 
-            kubectl apply `
-              --dry-run=client `
-              --validate=false `
-              -f k8s/
+            docker run --rm `
+              -v "$(Build.SourcesDirectory):/work" `
+              ghcr.io/yannh/kubeconform:latest `
+              -strict `
+              -ignore-missing-schemas `
+              -summary `
+              /work/k8s/*.y*ml
 
             if ($LASTEXITCODE -ne 0) {
-              Write-Error "Kubernetes manifest validation failed"
+              Write-Error "Kubernetes manifest validation failed (kubeconform)"
               exit 1
             }
 
-            Write-Host "Kubernetes manifests validated successfully"
-          displayName: Validate Kubernetes Manifests
+            Write-Host "Kubernetes manifests validated successfully (offline)"
+          displayName: Validate Kubernetes Manifests (Offline)
+
 
 
 - stage: K8s_Governance
