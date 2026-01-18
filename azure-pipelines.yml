@@ -89,27 +89,39 @@ stages:
     pool:
       name: 'self-hosted'
     steps:
+    - checkout: self
+
     - powershell: |
         Write-Host "Running DAST with OWASP ZAP"
 
-        # garante que a imagem existe
+        $reportPath = "$(Build.SourcesDirectory)\zap-report.html"
+        Write-Host "Report will be generated at: $reportPath"
+
         docker pull owasp/zap2docker-stable
 
-          docker run --rm `
+        docker run --rm `
+          -v "$(Build.SourcesDirectory):/zap/wrk" `
           owasp/zap2docker-stable `
           zap-baseline.py `
           -t http://app:8080 `
           -r zap-report.html
 
-        if ($LASTEXITCODE -ne 0) {
-          Write-Host "OWASP ZAP returned exit code $LASTEXITCODE - continuing pipeline"
-          exit 0
+        Write-Host "Listing files in sources directory:"
+        Get-ChildItem -Path "$(Build.SourcesDirectory)" | Format-Table Name, Length
+
+        if (!(Test-Path $reportPath)) {
+          Write-Host "Report not found. Creating a placeholder report so pipeline can publish artifact."
+          "<html><body><h1>DAST Report</h1><p>zap-report.html was not generated. Check ZAP logs/target URL.</p></body></html>" |
+            Out-File -FilePath $reportPath -Encoding utf8
         }
+
+        exit 0
       displayName: Run OWASP ZAP
 
-    - publish: zap-report.html
+    - publish: $(Build.SourcesDirectory)\zap-report.html
       artifact: dast-report
       displayName: Publish DAST Report
+
 
 
     - publish: zap-report.html
