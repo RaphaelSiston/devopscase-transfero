@@ -5,8 +5,6 @@ trigger:
 
 variables:
 - group: sonarcloud-secrets
-- name: vmImage
-  value: ubuntu-latest
 
 stages:
 - stage: Build
@@ -16,7 +14,6 @@ stages:
     displayName: Build Job
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Build stage"
@@ -30,7 +27,6 @@ stages:
     displayName: Tests Job
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Running unit tests"
@@ -46,7 +42,6 @@ stages:
     displayName: SonarCloud Analysis
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - checkout: self
 
@@ -79,7 +74,6 @@ stages:
     displayName: OWASP ZAP Scan
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Running DAST with OWASP ZAP"
@@ -98,7 +92,6 @@ stages:
     displayName: Deploy to Staging
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Deploy to staging"
@@ -113,7 +106,6 @@ stages:
     displayName: Validate and Auto-Fix Kubernetes
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         chmod +x scripts/validate_k8s.sh
@@ -144,7 +136,6 @@ stages:
     displayName: Deploy to Production
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Deploy to production"
@@ -159,7 +150,6 @@ stages:
     displayName: Generate Audit Report
     pool:
       name: 'self-hosted'
-      vmImage: $(vmImage)
     steps:
     - script: |
         echo '{ "tests": "passed", "quality_gate": "passed", "security": "checked", "kubernetes_policy": "compliant" }' > audit-report.json
