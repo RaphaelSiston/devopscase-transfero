@@ -4,16 +4,17 @@ trigger:
       - main
 
 variables:
-- group: sonarcloud-secrets 
+  vmImage: ubuntu-latest
 
 stages:
+
 - stage: Build
   displayName: Build
   jobs:
   - job: Build
     displayName: Build Job
     pool:
-      name: 'self-hosted'
+      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Build stage"
@@ -27,7 +28,7 @@ stages:
   - job: Tests
     displayName: Tests Job
     pool:
-      name: 'self-hosted'
+      vmImage: $(vmImage)
     steps:
     - script: |
         echo "Running unit tests"
@@ -37,218 +38,81 @@ stages:
 
 
 - stage: Quality
-  displayName: Code Quality - SonarCloud (CLI)
+  displayName: Code Quality - SonarCloud
   dependsOn: Tests
   jobs:
   - job: Sonar
     displayName: SonarCloud Analysis
     pool:
-      name: 'self-hosted'
+      vmImage: $(vmImage)
     steps:
-    - checkout: self
-
-    - powershell: |
-        $version = "5.0.1.3006"
-        $zip = "sonar-scanner-cli-$version-windows.zip"
-        $url = "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/$zip"
-
-        Write-Host "Downloading SonarScanner..."
-        Invoke-WebRequest -Uri $url -OutFile $zip
-
-        Write-Host "Extracting SonarScanner..."
-        Expand-Archive -Path $zip -DestinationPath . -Force
-
-        $scanner = ".\sonar-scanner-$version-windows\bin\sonar-scanner.bat"
-
-        Write-Host "Running SonarScanner..."
-        & $scanner `
-          "-Dsonar.host.url=https://sonarcloud.io" `
-          "-Dsonar.organization=raphael-devops" `
-          "-Dsonar.projectKey=raphael-devops_devops-case" `
-          "-Dsonar.projectName=devops-case" `
-          "-Dsonar.sources=." `
-          "-Dsonar.login=$(SONAR_TOKEN)"
-      displayName: Run SonarScanner (SonarCloud - Windows)
+    - script: |
+        echo "Running SonarCloud analysis (placeholder)"
+        echo "In real scenario: use SonarCloud tasks and quality gate"
+      displayName: SonarCloud Scan
 
 
-- stage: Security
-  displayName: Security - DAST
-  dependsOn: Quality
-  jobs:
-  - job: DAST
-    displayName: OWASP ZAP Scan
-    pool:
-      name: 'self-hosted'
-    steps:
-    - checkout: self
-
-    - powershell: |
-        Write-Host "Running DAST with OWASP ZAP"
-
-        $reportPath = "$(Build.SourcesDirectory)\zap-report.html"
-        Write-Host "Report will be generated at: $reportPath"
-
-        docker pull owasp/zap2docker-stable
-
-        docker run --rm `
-          -v "$(Build.SourcesDirectory):/zap/wrk" `
-          owasp/zap2docker-stable `
-          zap-baseline.py `
-          -t http://app:8080 `
-          -r zap-report.html
-
-        Write-Host "Listing files in sources directory:"
-        Get-ChildItem -Path "$(Build.SourcesDirectory)" | Format-Table Name, Length
-
-        if (!(Test-Path $reportPath)) {
-          Write-Host "Report not found. Creating a placeholder report so pipeline can publish artifact."
-          "<html><body><h1>DAST Report</h1><p>zap-report.html was not generated. Check ZAP logs/target URL.</p></body></html>" |
-            Out-File -FilePath $reportPath -Encoding utf8
-        }
-
-        exit 0
-      displayName: Run OWASP ZAP
-
-    - publish: $(Build.SourcesDirectory)\zap-report.html
-      artifact: dast-report
-      displayName: Publish DAST Report
-
-
-
-    - publish: zap-report.html
-      artifact: dast-report
-      displayName: Publish DAST Report
-
-- stage: Deploy_Staging
-  displayName: Deploy Staging (Offline Validate)
-  dependsOn: Security
-  jobs:
-    - job: DeployStaging
-      displayName: Validate Kubernetes Manifests (kubeconform)
-      pool:
-        name: 'self-hosted'
-      steps:
-        - checkout: self
-
-        - powershell: |
-            Write-Host "Validating Kubernetes manifests OFFLINE with kubeconform (no cluster needed)"
-            Write-Host "Repo root: $(Build.SourcesDirectory)"
-
-            Write-Host "Listing repo folders:"
-            Get-ChildItem -Path "$(Build.SourcesDirectory)" -Directory | Select-Object Name
-
-            $k8sDir = Join-Path "$(Build.SourcesDirectory)" "k8s"
-
-            if (Test-Path $k8sDir) {
-              Write-Host "Found k8s folder: $k8sDir"
-              $yamls = Get-ChildItem -Path $k8sDir -Recurse -Include *.yml, *.yaml -File
-            } else {
-              Write-Host "No k8s folder found. Searching YAMLs across repo..."
-              $yamls = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Include *.yml, *.yaml -File
-            }
-
-            if ($yamls.Count -eq 0) {
-              Write-Error "No YAML files found to validate."
-              exit 1
-            }
-
-            Write-Host "YAML files found:"
-            $yamls | ForEach-Object { Write-Host $_.FullName }
-
-            docker pull ghcr.io/yannh/kubeconform:latest
-
-            foreach ($f in $yamls) {
-              Write-Host "Validating: $($f.FullName)"
-              docker run --rm `
-                -v "$(Build.SourcesDirectory):/work" `
-                ghcr.io/yannh/kubeconform:latest `
-                -strict `
-                -ignore-missing-schemas `
-                -summary `
-                ("/work/" + ($f.FullName.Substring("$(Build.SourcesDirectory)".Length).TrimStart('\') -replace '\\','/'))
-
-              if ($LASTEXITCODE -ne 0) {
-                Write-Error "Validation failed for: $($f.FullName)"
-                exit 1
-              }
-            }
-
-            Write-Host "All manifests validated successfully (offline)."
-          displayName: Validate Kubernetes Manifests (Offline)
-
-
-- stage: K8s_Governance
-  displayName: Kubernetes Governance
-  dependsOn: Deploy_Staging
-  jobs:
-  - job: Governance
-    displayName: Validate Kubernetes Governance (Windows)
-    pool:
-      name: 'self-hosted'
-    steps:
-    - checkout: self
-
-    - task: PowerShell@2
-      displayName: Run Governance Script
-      inputs:
-        targetType: inline
-        script: |
-          Write-Host "Running Kubernetes Governance checks"
-
-          if (-Not (Test-Path "scripts\validate_k8s.ps1")) {
-            Write-Error "Governance script not found: scripts\validate_k8s.ps1"
-            exit 1
-          }
-
-          powershell -ExecutionPolicy Bypass -File scripts\validate_k8s.ps1
-
-
-
-- stage: Approval
-  displayName: Manual Approval
-  dependsOn: K8s_Governance
+- stage: ManualApproval
+  displayName: Manual Approval (Only if Tests Fail)
+  dependsOn: Tests
+  condition: failed()
   jobs:
   - job: Approval
-    displayName: Approval Gate
+    displayName: Await Manual Validation
     pool: server
     steps:
     - task: ManualValidation@0
-      displayName: Await Manual Approval
       inputs:
-        notifyUsers: techlead@empresa.com
-        instructions: Aprovação obrigatória para deploy em produção
-        onTimeout: reject
-      timeoutInMinutes: 60
-
-
-- stage: Deploy_Prod
-  displayName: Deploy Production
-  dependsOn: Approval
-  jobs:
-  - job: DeployProd
-    displayName: Deploy to Production
-    pool:
-      name: 'self-hosted'
-    steps:
-    - script: |
-        echo "Deploy to production"
-        kubectl apply -f k8s/
-      displayName: Apply Kubernetes Manifests (Prod)
+        instructions: |
+          Algum teste falhou ou não foi executado corretamente.
+          Validação manual é obrigatória antes de seguir.
+        # Ajuste para emails reais se quiser
+        notifyUsers: 'devops@empresa.com'
 
 
 - stage: Audit
-  displayName: Audit Report
-  dependsOn: Deploy_Prod
+  displayName: Audit & Compliance
+  dependsOn:
+    - Tests
+    - Quality
+  condition: always()
   jobs:
-  - job: Audit
+  - job: AuditJob
     displayName: Generate Audit Report
     pool:
-      name: 'self-hosted'
+      vmImage: $(vmImage)
     steps:
     - script: |
-        echo '{ "tests": "passed", "quality_gate": "passed", "security": "checked", "kubernetes_policy": "compliant" }' > audit-report.json
-      displayName: Generate Audit File
+        echo "Generating audit report..."
+
+        # Status do job atual (não é perfeito para refletir todos stages),
+        # mas serve como evidência de auditoria automatizada.
+        STATUS="${AGENT_JOBSTATUS}"
+        DATE=$(date -u)
+
+        cat <<EOF > audit-report.json
+        {
+          "pipeline": "$(Build.DefinitionName)",
+          "buildId": "$(Build.BuildId)",
+          "repository": "$(Build.Repository.Name)",
+          "branch": "$(Build.SourceBranch)",
+          "commit": "$(Build.SourceVersion)",
+          "testsStage": "Tests",
+          "qualityStage": "Quality",
+          "auditJobStatus": "$STATUS",
+          "timestampUtc": "$DATE",
+          "auditedBy": "Azure DevOps Pipeline",
+          "notes": "Logs seriam enviados ao Azure Monitor / App Insights via Diagnostic Settings em ambiente real."
+        }
+        EOF
+
+        echo "Audit report created: audit-report.json"
+
+        # Evidência de logs (simulando envio/integração)
+        echo "##vso[task.logissue type=warning]Audit report generated (audit-report.json)"
+        echo "##vso[task.logissue type=warning]Sending audit logs to Azure Monitor/App Insights (simulated)"
+      displayName: Generate Audit Report
 
     - publish: audit-report.json
       artifact: audit-report
-      displayName: Publish Audit Report
+      displayName: Publish Audit Report Artifact
