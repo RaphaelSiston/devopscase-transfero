@@ -104,4 +104,3 @@ stages:
     - publish: audit-report.json
       artifact: audit-report
       displayName: Publish Audit Report Artifact
-
