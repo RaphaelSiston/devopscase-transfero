@@ -41,35 +41,37 @@ stages:
       name: self-hosted
     steps:
     - checkout: self
-    - script: |
-        set -e
-        echo "Running unit tests"
-        echo "unit_ok" > unit.txt
-        echo "Running integration tests"
-        echo "integration_ok" > integration.txt
-        echo "Running load tests"
-        echo "load_ok" > load.txt
+
+    - powershell: |
+        Write-Host "Running unit tests"
+        "unit_ok" | Out-File -FilePath unit.txt -Encoding utf8
+
+        Write-Host "Running integration tests"
+        "integration_ok" | Out-File -FilePath integration.txt -Encoding utf8
+
+        Write-Host "Running load tests"
+        "load_ok" | Out-File -FilePath load.txt -Encoding utf8
       displayName: Run Tests
 
-    - script: |
-        set -e
-        test -f unit.txt
-        test -f integration.txt
-        test -f load.txt
-        echo "All tests executed"
+    - powershell: |
+        if (!(Test-Path unit.txt)) { throw "unit.txt not found" }
+        if (!(Test-Path integration.txt)) { throw "integration.txt not found" }
+        if (!(Test-Path load.txt)) { throw "load.txt not found" }
+        Write-Host "All tests executed"
       displayName: Validate tests executed
-
-
 
     - publish: unit.txt
       artifact: tests-unit
       displayName: Publish unit evidence
+
     - publish: integration.txt
       artifact: tests-integration
       displayName: Publish integration evidence
+
     - publish: load.txt
       artifact: tests-load
       displayName: Publish load evidence
+
 
 
 - stage: Quality
