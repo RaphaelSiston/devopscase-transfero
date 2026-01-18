@@ -74,33 +74,34 @@ stages:
     pool:
       name: self-hosted
     steps:
-    - script: |
-        echo "Generating audit report..."
+    - powershell: |
+        Write-Host "Generating audit report..."
 
-        STATUS="${AGENT_JOBSTATUS}"
-        DATE=$(date -u)
+        $status = "$(Agent.JobStatus)"
+        $date = (Get-Date).ToUniversalTime().ToString("o")
 
-        cat <<EOF > audit-report.json
-        {
-          "pipeline": "$(Build.DefinitionName)",
-          "buildId": "$(Build.BuildId)",
-          "repository": "$(Build.Repository.Name)",
-          "branch": "$(Build.SourceBranch)",
-          "commit": "$(Build.SourceVersion)",
-          "testsStage": "Tests",
-          "qualityStage": "Quality",
-          "auditJobStatus": "$STATUS",
-          "timestampUtc": "$DATE",
-          "auditedBy": "Azure DevOps Pipeline",
-          "notes": "Logs seriam enviados ao Azure Monitor / App Insights via Diagnostic Settings em ambiente real."
-        }
-        EOF
+        $report = @{
+          pipeline      = "$(Build.DefinitionName)"
+          buildId       = "$(Build.BuildId)"
+          repository    = "$(Build.Repository.Name)"
+          branch        = "$(Build.SourceBranch)"
+          commit        = "$(Build.SourceVersion)"
+          testsStage    = "Tests"
+          qualityStage  = "Quality"
+          auditJobStatus= $status
+          timestampUtc  = $date
+          auditedBy     = "Azure DevOps Pipeline"
+          notes         = "Logs seriam enviados ao Azure Monitor / App Insights via Diagnostic Settings em ambiente real."
+        } | ConvertTo-Json -Depth 5
 
-        echo "Audit report created: audit-report.json"
-        echo "##vso[task.logissue type=warning]Audit report generated (audit-report.json)"
-        echo "##vso[task.logissue type=warning]Sending audit logs to Azure Monitor/App Insights (simulated)"
+        $report | Out-File -FilePath audit-report.json -Encoding utf8
+
+        Write-Host "Audit report created: audit-report.json"
+        Write-Host "##vso[task.logissue type=warning]Audit report generated (audit-report.json)"
+        Write-Host "##vso[task.logissue type=warning]Sending audit logs to Azure Monitor/App Insights (simulated)"
       displayName: Generate Audit Report
 
     - publish: audit-report.json
       artifact: audit-report
       displayName: Publish Audit Report Artifact
+
