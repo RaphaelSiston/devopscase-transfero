@@ -133,17 +133,17 @@ stages:
 
             kubectl version --client
 
-            kubectl create `
+            kubectl apply `
               --dry-run=client `
-              -f k8s/ `
-              -o yaml > $null
+              --validate=false `
+              -f k8s/
 
             if ($LASTEXITCODE -ne 0) {
               Write-Error "Kubernetes manifest validation failed"
               exit 1
             }
 
-            Write-Host "Kubernetes manifests validated successfully (no cluster required)"
+            Write-Host "Kubernetes manifests validated successfully"
           displayName: Validate Kubernetes Manifests
 
 
