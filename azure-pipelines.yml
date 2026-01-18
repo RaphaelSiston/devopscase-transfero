@@ -182,14 +182,26 @@ stages:
   dependsOn: Deploy_Staging
   jobs:
   - job: Governance
-    displayName: Validate and Auto-Fix Kubernetes
+    displayName: Validate Kubernetes Governance (Windows)
     pool:
       name: 'self-hosted'
     steps:
-    - script: |
-        chmod +x scripts/validate_k8s.sh
-        ./scripts/validate_k8s.sh
+    - checkout: self
+
+    - task: PowerShell@2
       displayName: Run Governance Script
+      inputs:
+        targetType: inline
+        script: |
+          Write-Host "Running Kubernetes Governance checks"
+
+          if (-Not (Test-Path "scripts\validate_k8s.ps1")) {
+            Write-Error "Governance script not found: scripts\validate_k8s.ps1"
+            exit 1
+          }
+
+          powershell -ExecutionPolicy Bypass -File scripts\validate_k8s.ps1
+
 
 
 - stage: Approval
