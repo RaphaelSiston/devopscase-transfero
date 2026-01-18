@@ -128,26 +128,34 @@ stages:
       artifact: dast-report
       displayName: Publish DAST Report
 
-# =========================
-# DEPLOY STAGING
-# =========================
 - stage: Deploy_Staging
-  displayName: Deploy Staging
+  displayName: Deploy Staging (Dry Run)
   dependsOn: Security
   jobs:
   - job: DeployStaging
-    displayName: Deploy to Staging
+    displayName: Validate Kubernetes Manifests (Dry Run)
     pool:
       name: 'self-hosted'
     steps:
-    - script: |
-        echo "Deploy to staging"
-        kubectl apply -f k8s/
-      displayName: Apply Kubernetes Manifests
+    - powershell: |
+        Write-Host "Validating Kubernetes manifests with dry-run"
 
-# =========================
-# KUBERNETES GOVERNANCE
-# =========================
+        kubectl version --client
+
+        kubectl apply `
+          --dry-run=client `
+          --validate=true `
+          -f k8s/
+
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "Kubernetes manifest validation failed"
+          exit 1
+        }
+
+        Write-Host "Kubernetes manifests validated successfully"
+      displayName: Validate Kubernetes Manifests
+
+
 - stage: K8s_Governance
   displayName: Kubernetes Governance
   dependsOn: Deploy_Staging
