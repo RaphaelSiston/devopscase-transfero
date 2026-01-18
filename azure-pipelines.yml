@@ -84,16 +84,17 @@ stages:
       name: self-hosted
     steps:
     - checkout: self
-    - script: |
-        set -e
-        echo "Running SonarCloud analysis (placeholder)"
-        echo "QUALITY_GATE=OK" > sonar-result.txt
-        cat sonar-result.txt
+
+    - powershell: |
+        Write-Host "Running SonarCloud analysis (placeholder)"
+        "QUALITY_GATE=OK" | Out-File -FilePath sonar-result.txt -Encoding utf8
+        Get-Content sonar-result.txt
       displayName: SonarCloud Scan (simulated)
 
     - publish: sonar-result.txt
       artifact: sonar-report
       displayName: Publish Sonar report
+
 
 
 - stage: ManualApproval
