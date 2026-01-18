@@ -4,12 +4,15 @@ trigger:
       - main
 
 variables:
-  
-  K8S_MANIFEST: "k8s/deployment.yml"
-  K8S_NAMESPACE: "default"
+- name: K8S_MANIFEST
+  value: "k8s/deployment.yml"
+- name: K8S_NAMESPACE
+  value: "default"
+- name: DAST_TARGET_URL
+  value: "https://example.com"
+- name: ZAP_IMAGE
+  value: "owasp/zap2docker-stable"
 
-  DAST_TARGET_URL: "https://example.com"
-  ZAP_IMAGE: "owasp/zap2docker-stable"
 
 stages:
 
@@ -53,8 +56,10 @@ stages:
         test -f unit.txt
         test -f integration.txt
         test -f load.txt
-        echo "All tests executed ✅"
+        echo "All tests executed"
       displayName: Validate tests executed
+
+
 
     - publish: unit.txt
       artifact: tests-unit
@@ -161,7 +166,7 @@ stages:
   displayName: Deploy to Production (K8s) + Policy Fix
   dependsOn:
     - Audit
-  condition: succeeded('Audit')
+  condition: succeeded()
   jobs:
   - job: K8sPolicyAndDeploy
     displayName: K8s Policy Fix + Deploy
