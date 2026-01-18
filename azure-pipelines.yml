@@ -3,9 +3,6 @@ trigger:
     include:
       - main
 
-variables:
-  vmImage: ubuntu-latest
-
 stages:
 
 - stage: Build
@@ -14,12 +11,11 @@ stages:
   - job: Build
     displayName: Build Job
     pool:
-      vmImage: $(vmImage)
+      name: self-hosted
     steps:
     - script: |
         echo "Build stage"
       displayName: Build Application
-
 
 - stage: Tests
   displayName: Tests
@@ -28,14 +24,13 @@ stages:
   - job: Tests
     displayName: Tests Job
     pool:
-      vmImage: $(vmImage)
+      name: self-hosted
     steps:
     - script: |
         echo "Running unit tests"
         echo "Running integration tests"
         echo "Running load tests"
       displayName: Run Tests
-
 
 - stage: Quality
   displayName: Code Quality - SonarCloud
@@ -44,18 +39,17 @@ stages:
   - job: Sonar
     displayName: SonarCloud Analysis
     pool:
-      vmImage: $(vmImage)
+      name: self-hosted
     steps:
     - script: |
         echo "Running SonarCloud analysis (placeholder)"
         echo "In real scenario: use SonarCloud tasks and quality gate"
       displayName: SonarCloud Scan
 
-
 - stage: ManualApproval
   displayName: Manual Approval (Only if Tests Fail)
   dependsOn: Tests
-  condition: failed()
+  condition: failed('Tests')
   jobs:
   - job: Approval
     displayName: Await Manual Validation
@@ -66,9 +60,7 @@ stages:
         instructions: |
           Algum teste falhou ou não foi executado corretamente.
           Validação manual é obrigatória antes de seguir.
-        # Ajuste para emails reais se quiser
         notifyUsers: 'devops@empresa.com'
-
 
 - stage: Audit
   displayName: Audit & Compliance
@@ -80,13 +72,11 @@ stages:
   - job: AuditJob
     displayName: Generate Audit Report
     pool:
-      vmImage: $(vmImage)
+      name: self-hosted
     steps:
     - script: |
         echo "Generating audit report..."
 
-        # Status do job atual (não é perfeito para refletir todos stages),
-        # mas serve como evidência de auditoria automatizada.
         STATUS="${AGENT_JOBSTATUS}"
         DATE=$(date -u)
 
@@ -107,8 +97,6 @@ stages:
         EOF
 
         echo "Audit report created: audit-report.json"
-
-        # Evidência de logs (simulando envio/integração)
         echo "##vso[task.logissue type=warning]Audit report generated (audit-report.json)"
         echo "##vso[task.logissue type=warning]Sending audit logs to Azure Monitor/App Insights (simulated)"
       displayName: Generate Audit Report
