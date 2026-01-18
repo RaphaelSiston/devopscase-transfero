@@ -308,40 +308,43 @@ stages:
     pool:
       name: self-hosted
     steps:
-    - script: |
-        set -e
-        mkdir -p observability
-        cat > observability/observability-evidence.txt << 'EOF'
-        Observability Integration Plan (Azure Monitor + Kubernetes)
-        ==========================================================
-        Goal:
-          - Collect CPU, memory and replicas from Kubernetes and visualize in Azure Monitor (Workbooks/Container Insights)
-            or Grafana (Azure Managed Grafana / Prometheus datasource).
+    - powershell: |
+        New-Item -ItemType Directory -Force -Path observability | Out-Null
 
-        Recommended (AKS):
-          1) Enable Container Insights:
-             az aks enable-addons -g <AKS_RG> -n <AKS_NAME> -a monitoring --workspace-resource-id <LAW_ID>
+        $content = @"
+Observability Integration Plan (Azure Monitor + Kubernetes)
+==========================================================
+Goal:
+  - Collect CPU, memory and replicas from Kubernetes and visualize in Azure Monitor (Workbooks/Container Insights)
+    or Grafana (Azure Managed Grafana / Prometheus datasource).
 
-          2) Validate data:
-             Azure Monitor -> Containers (Insights)
-             Log Analytics -> KQL queries (Perf, InsightsMetrics, ContainerLog)
+Recommended (AKS):
+  1) Enable Container Insights:
+     az aks enable-addons -g <AKS_RG> -n <AKS_NAME> -a monitoring --workspace-resource-id <LAW_ID>
 
-          3) Grafana:
-             - Use Azure Managed Grafana with Azure Monitor datasource (Log Analytics) OR
-             - Use Azure Managed Prometheus + Grafana Prometheus datasource.
+  2) Validate data:
+     Azure Monitor -> Containers (Insights)
+     Log Analytics -> KQL queries (Perf, InsightsMetrics, ContainerLog)
 
-        Metrics required:
-          - CPU usage (nodes/pods/containers)
-          - Memory usage (nodes/pods/containers)
-          - Replicas desired/available (deployments) (kube-state-metrics / insights)
+  3) Grafana:
+     - Use Azure Managed Grafana with Azure Monitor datasource (Log Analytics) OR
+     - Use Azure Managed Prometheus + Grafana Prometheus datasource.
 
-        Evidence in this pipeline:
-          - This file documents the configuration steps and expected dashboards.
-        EOF
+Metrics required:
+  - CPU usage (nodes/pods/containers)
+  - Memory usage (nodes/pods/containers)
+  - Replicas desired/available (deployments) (kube-state-metrics / insights)
 
-        echo "Observability evidence generated."
+Evidence in this pipeline:
+  - This file documents the configuration steps and expected dashboards.
+ "@
+
+        $content | Out-File -FilePath observability/observability-evidence.txt -Encoding utf8
+        Write-Host "Observability evidence generated."
       displayName: Generate Observability Evidence
 
     - publish: observability
       artifact: observability-evidence
       displayName: Publish Observability Evidence Artifact
+
+
