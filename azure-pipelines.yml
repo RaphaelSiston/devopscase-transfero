@@ -132,27 +132,49 @@ stages:
 
         - powershell: |
             Write-Host "Validating Kubernetes manifests OFFLINE with kubeconform (no cluster needed)"
-            Write-Host "Sources: $(Build.SourcesDirectory)"
+            Write-Host "Repo root: $(Build.SourcesDirectory)"
 
-            
-            docker pull ghcr.io/yannh/kubeconform:latest
+            Write-Host "Listing repo folders:"
+            Get-ChildItem -Path "$(Build.SourcesDirectory)" -Directory | Select-Object Name
 
-            docker run --rm `
-              -v "$(Build.SourcesDirectory):/work" `
-              ghcr.io/yannh/kubeconform:latest `
-              -strict `
-              -ignore-missing-schemas `
-              -summary `
-              /work/k8s/*.y*ml
+            $k8sDir = Join-Path "$(Build.SourcesDirectory)" "k8s"
 
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Kubernetes manifest validation failed (kubeconform)"
+            if (Test-Path $k8sDir) {
+              Write-Host "Found k8s folder: $k8sDir"
+              $yamls = Get-ChildItem -Path $k8sDir -Recurse -Include *.yml, *.yaml -File
+            } else {
+              Write-Host "No k8s folder found. Searching YAMLs across repo..."
+              $yamls = Get-ChildItem -Path "$(Build.SourcesDirectory)" -Recurse -Include *.yml, *.yaml -File
+            }
+
+            if ($yamls.Count -eq 0) {
+              Write-Error "No YAML files found to validate."
               exit 1
             }
 
-            Write-Host "Kubernetes manifests validated successfully (offline)"
-          displayName: Validate Kubernetes Manifests (Offline)
+            Write-Host "YAML files found:"
+            $yamls | ForEach-Object { Write-Host $_.FullName }
 
+            docker pull ghcr.io/yannh/kubeconform:latest
+
+            foreach ($f in $yamls) {
+              Write-Host "Validating: $($f.FullName)"
+              docker run --rm `
+                -v "$(Build.SourcesDirectory):/work" `
+                ghcr.io/yannh/kubeconform:latest `
+                -strict `
+                -ignore-missing-schemas `
+                -summary `
+                ("/work/" + ($f.FullName.Substring("$(Build.SourcesDirectory)".Length).TrimStart('\') -replace '\\','/'))
+
+              if ($LASTEXITCODE -ne 0) {
+                Write-Error "Validation failed for: $($f.FullName)"
+                exit 1
+              }
+            }
+
+            Write-Host "All manifests validated successfully (offline)."
+          displayName: Validate Kubernetes Manifests (Offline)
 
 
 - stage: K8s_Governance
