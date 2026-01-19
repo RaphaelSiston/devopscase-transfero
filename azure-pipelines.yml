@@ -4,84 +4,55 @@ trigger:
       - main
 
 variables:
-  - name: vmPool
-    value: self-hosted 
-
-
-  # K8s / DAST (simulados)
+  - name: K8S_MANIFEST
+    value: "k8s/deployment.yml"
   - name: K8S_NAMESPACE
     value: "default"
   - name: DAST_TARGET_URL
     value: "https://example.com"
 
-  # Para DEMO: quando true, falha propositalmente em Tests
-  - name: FORCE_FAIL_TESTS
-    value: "false"
-
 stages:
   - stage: Build
     displayName: Build
     jobs:
-      - job: BuildJob
+      - job: Build
         displayName: Build Job
         pool:
-          name: $(vmPool)
+          name: self-hosted
         steps:
           - checkout: self
-          - task: PowerShell@2
-            displayName: Build Application (simulated)
-            inputs:
-              targetType: inline
-              script: |
-                Write-Host "Build stage OK (simulated)"
+          - powershell: |
+              Write-Host "Build stage"
+            displayName: Build Application
 
   - stage: Tests
     displayName: Tests
     dependsOn: Build
     jobs:
-      - job: TestsJob
+      - job: Tests
         displayName: Tests Job
         pool:
-          name: $(vmPool)
+          name: self-hosted
         steps:
           - checkout: self
 
-          - task: PowerShell@2
-            displayName: Run Tests (simulated)
-            inputs:
-              targetType: inline
-              script: |
-                Write-Host "Running unit tests"
-                "unit_ok" | Out-File -FilePath unit.txt -Encoding utf8
+          - powershell: |
+              Write-Host "Running unit tests"
+              "unit_ok" | Out-File -FilePath unit.txt -Encoding utf8
 
-                Write-Host "Running integration tests"
-                "integration_ok" | Out-File -FilePath integration.txt -Encoding utf8
+              Write-Host "Running integration tests"
+              "integration_ok" | Out-File -FilePath integration.txt -Encoding utf8
 
-                Write-Host "Running load tests"
-                "load_ok" | Out-File -FilePath load.txt -Encoding utf8
+              Write-Host "Running load tests"
+              "load_ok" | Out-File -FilePath load.txt -Encoding utf8
+            displayName: Run Tests
 
-          - task: PowerShell@2
+          - powershell: |
+              if (!(Test-Path unit.txt)) { throw "unit.txt not found" }
+              if (!(Test-Path integration.txt)) { throw "integration.txt not found" }
+              if (!(Test-Path load.txt)) { throw "load.txt not found" }
+              Write-Host "All tests executed"
             displayName: Validate tests executed
-            inputs:
-              targetType: inline
-              script: |
-                if (!(Test-Path unit.txt)) { throw "unit.txt not found" }
-                if (!(Test-Path integration.txt)) { throw "integration.txt not found" }
-                if (!(Test-Path load.txt)) { throw "load.txt not found" }
-                Write-Host "All tests executed"
-
-          # >>> AQUI está a SIMULAÇÃO DO ERRO <<<
-          - task: PowerShell@2
-            displayName: Force failure (demo switch)
-            inputs:
-              targetType: inline
-              script: |
-                Write-Host "FORCE_FAIL_TESTS=$(FORCE_FAIL_TESTS)"
-                if ("$(FORCE_FAIL_TESTS)" -eq "true") {
-                  Write-Host "Forcing failure to trigger Manual Approval..."
-                  throw "Forced failure (FORCE_FAIL_TESTS=true)"
-                }
-                Write-Host "No forced failure. Continuing."
 
           - publish: unit.txt
             artifact: tests-unit
@@ -96,26 +67,21 @@ stages:
             displayName: Publish load evidence
 
   - stage: Quality
-    displayName: Code Quality - SonarCloud (simulated)
+    displayName: Code Quality - SonarCloud
     dependsOn: Tests
-    # Só roda Quality se Tests tiver passado (padrão gate)
-    condition: succeeded()
     jobs:
-      - job: SonarJob
+      - job: Sonar
         displayName: SonarCloud Analysis
         pool:
-          name: $(vmPool)
+          name: self-hosted
         steps:
           - checkout: self
 
-          - task: PowerShell@2
+          - powershell: |
+              Write-Host "Running SonarCloud analysis (placeholder)"
+              "QUALITY_GATE=OK" | Out-File -FilePath sonar-result.txt -Encoding utf8
+              Get-Content sonar-result.txt
             displayName: SonarCloud Scan (simulated)
-            inputs:
-              targetType: inline
-              script: |
-                Write-Host "Running SonarCloud analysis (placeholder)"
-                "QUALITY_GATE=OK" | Out-File -FilePath sonar-result.txt -Encoding utf8
-                Get-Content sonar-result.txt
 
           - publish: sonar-result.txt
             artifact: sonar-report
@@ -126,7 +92,6 @@ stages:
     dependsOn:
       - Tests
       - Quality
-    # Se qualquer um falhar OU ficar skipped por conta de falha anterior, aciona aprovação
     condition: failed()
     jobs:
       - job: Approval
@@ -138,95 +103,77 @@ stages:
               instructions: |
                 Um ou mais estágios falharam (Tests/Quality).
                 O Líder Técnico deve revisar os logs e artifacts para aprovar exceção ou exigir correção.
-
-                DEMO:
-                - Para forçar falha: rode a pipeline com FORCE_FAIL_TESTS=true
-                - Se aprovado: Deploy será liberado como exceção
-                - Se rejeitado: Deploy será bloqueado
-              notifyUsers: "devops@empresa.com"
-              onTimeout: reject
-              timeoutInMinutes: 60
+                notifyUsers: "devops@empresa.com"
+                onTimeout: reject
+                timeoutInMinutes: 60
 
   - stage: Audit
     displayName: Audit & Compliance
     dependsOn:
       - Tests
       - Quality
-      - ManualApproval
+
     condition: always()
     jobs:
       - job: AuditJob
         displayName: Generate Audit Report
         pool:
-          name: $(vmPool)
+          name: self-hosted
         steps:
           - checkout: self
-          - task: PowerShell@2
+
+          - powershell: |
+              Write-Host "Generating audit report..."
+
+              $status = "$(Agent.JobStatus)"
+              $date = (Get-Date).ToUniversalTime().ToString("o")
+
+              $report = @{
+                pipeline            = "$(Build.DefinitionName)"
+                buildId             = "$(Build.BuildId)"
+                repository          = "$(Build.Repository.Name)"
+                branch              = "$(Build.SourceBranch)"
+                commit              = "$(Build.SourceVersion)"
+                testsStage          = "Tests"
+                qualityStage        = "Quality"
+                manualApprovalStage = "ManualApproval (conditional)"
+                auditJobStatus      = $status
+                timestampUtc        = $date
+                auditedBy           = "Azure DevOps Pipeline"
+                notes               = "Logs/metrics seriam integrados ao Azure Monitor / Grafana via Container Insights / Managed Prometheus / Azure Managed Grafana."
+              } | ConvertTo-Json -Depth 5
+
+              $report | Out-File -FilePath audit-report.json -Encoding utf8
+              Write-Host "Audit report created: audit-report.json"
+              Write-Host "##vso[task.logissue type=warning]Audit report generated (audit-report.json)"
+              Write-Host "##vso[task.logissue type=warning]Sending audit logs to Azure Monitor/App Insights (simulated)"
             displayName: Generate Audit Report
-            inputs:
-              targetType: inline
-              script: |
-                Write-Host "Generating audit report..."
-
-                $date = (Get-Date).ToUniversalTime().ToString("o")
-
-                $report = @{
-                  pipeline       = "$(Build.DefinitionName)"
-                  buildId        = "$(Build.BuildId)"
-                  repository     = "$(Build.Repository.Name)"
-                  branch         = "$(Build.SourceBranch)"
-                  commit         = "$(Build.SourceVersion)"
-                  forceFailTests = "$(FORCE_FAIL_TESTS)"
-                  testsResult    = "$(Agent.JobStatus)"
-                  timestampUtc   = $date
-                  notes          = "Audit always runs. In real use: integrate to Azure Monitor/App Insights."
-                } | ConvertTo-Json -Depth 5
-
-                $report | Out-File -FilePath audit-report.json -Encoding utf8
-                Write-Host "Audit report created: audit-report.json"
 
           - publish: audit-report.json
             artifact: audit-report
             displayName: Publish Audit Report Artifact
 
   - stage: Deploy
-    displayName: Deploy to Production (K8s) (simulated)
-    dependsOn:
-      - Audit
-      - Tests
-      - Quality
-      - ManualApproval
-
-    # Roda deploy se:
-    # - Tests + Quality passaram
-    # OU
-    # - ManualApproval foi aprovado (exceção autorizada)
-    condition: |
-      or(
-        and(succeeded('Tests'), succeeded('Quality')),
-        succeeded('ManualApproval')
-      )
-
+    displayName: Deploy to Production (K8s) + Policy Fix (simulated)
+    dependsOn: Audit
+    condition: succeeded()
     jobs:
       - job: DeployJob
         displayName: Deploy Job
         pool:
-          name: $(vmPool)
+          name: self-hosted
         steps:
           - checkout: self
 
-          - task: PowerShell@2
-            displayName: K8s Deploy (simulated)
-            inputs:
-              targetType: inline
-              script: |
-                New-Item -ItemType Directory -Force -Path out-manifests | Out-Null
-                "Simulated corrected deployment manifest" | Out-File out-manifests/deployment.corrected.yml -Encoding utf8
-                "Simulated HPA manifest" | Out-File out-manifests/hpa.generated.yml -Encoding utf8
+          - powershell: |
+              New-Item -ItemType Directory -Force -Path out-manifests | Out-Null
+              "Simulated corrected deployment manifest" | Out-File out-manifests/deployment.corrected.yml -Encoding utf8
+              "Simulated HPA manifest" | Out-File out-manifests/hpa.generated.yml -Encoding utf8
 
-                Write-Host "Simulating deploy..."
-                Write-Host "kubectl apply -f out-manifests/deployment.corrected.yml -n $(K8S_NAMESPACE)"
-                Write-Host "kubectl apply -f out-manifests/hpa.generated.yml -n $(K8S_NAMESPACE)"
+              Write-Host "Simulating deploy..."
+              Write-Host "kubectl apply -f out-manifests/deployment.corrected.yml -n $(K8S_NAMESPACE)"
+              Write-Host "kubectl apply -f out-manifests/hpa.generated.yml -n $(K8S_NAMESPACE)"
+            displayName: K8s Policy Fix + Deploy (simulated)
 
           - publish: out-manifests
             artifact: k8s-manifests
@@ -240,24 +187,77 @@ stages:
       - job: ZapScan
         displayName: OWASP ZAP Scan
         pool:
-          name: $(vmPool)
+          name: self-hosted
         steps:
           - checkout: none
 
-          - task: PowerShell@2
+          - powershell: |
+              New-Item -ItemType Directory -Force -Path zap-out | Out-Null
+
+              $html = @"
+              <html><body>
+              <h2>OWASP ZAP Report (SIMULATED)</h2>
+              <p>Target: $(DAST_TARGET_URL)</p>
+              <p>Status: OK (simulated)</p>
+              </body></html>
+              "@
+
+              $html | Out-File -FilePath zap-out/zap_report.html -Encoding utf8
+              '{ "target": "' + "$(DAST_TARGET_URL)" + '", "status": "OK", "mode": "simulated" }' |
+                Out-File -FilePath zap-out/zap_report.json -Encoding utf8
+
+              Write-Host "DAST scan simulated. Reports generated."
             displayName: Run DAST (simulated)
-            inputs:
-              targetType: inline
-              script: |
-                New-Item -ItemType Directory -Force -Path zap-out | Out-Null
 
-                $html = @"
-                <html><body>
-                <h2>OWASP ZAP Report (SIMULATED)</h2>
-                <p>Target: $(DAST_TARGET_URL)</p>
-                <p>Status: OK (simulated)</p>
-                </body></html>
-                "@
+          - publish: zap-out
+            artifact: dast-report
+            displayName: Publish DAST report
 
-                $html | Out-File -FilePath zap-out/zap_report.html -Encoding utf8
-                '{ "target": "' + "$(DAST_TARGET_URL)" + '", "status": "OK", "mode": "simulated" }'
+  - stage: Observability
+    displayName: Observability - Azure Monitor / Grafana (evidence)
+    dependsOn: Deploy
+    condition: always()
+    jobs:
+      - job: ObsEvidence
+        displayName: Create Observability Evidence
+        pool:
+          name: self-hosted
+        steps:
+          - powershell: |
+              New-Item -ItemType Directory -Force -Path observability | Out-Null
+
+              $content = @'
+              Observability Integration Plan (Azure Monitor + Kubernetes)
+              ==========================================================
+              Goal:
+                - Collect CPU, memory and replicas from Kubernetes and visualize in Azure Monitor (Workbooks/Container Insights)
+                  or Grafana (Azure Managed Grafana / Prometheus datasource).
+
+              Recommended (AKS):
+                1) Enable Container Insights:
+                   az aks enable-addons -g <AKS_RG> -n <AKS_NAME> -a monitoring --workspace-resource-id <LAW_ID>
+
+                2) Validate data:
+                   Azure Monitor -> Containers (Insights)
+                   Log Analytics -> KQL queries (Perf, InsightsMetrics, ContainerLog)
+
+                3) Grafana:
+                   - Use Azure Managed Grafana with Azure Monitor datasource (Log Analytics) OR
+                   - Use Azure Managed Prometheus + Grafana Prometheus datasource.
+
+              Metrics required:
+                - CPU usage (nodes/pods/containers)
+                - Memory usage (nodes/pods/containers)
+                - Replicas desired/available (deployments) (kube-state-metrics / insights)
+
+              Evidence in this pipeline:
+                - This file documents the configuration steps and expected dashboards.
+              '@
+
+              $content | Out-File -FilePath observability/observability-evidence.txt -Encoding utf8
+              Write-Host "Observability evidence generated."
+            displayName: Generate Observability Evidence
+
+          - publish: observability
+            artifact: observability-evidence
+            displayName: Publish Observability Evidence Artifact
