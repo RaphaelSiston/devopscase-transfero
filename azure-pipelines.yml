@@ -112,7 +112,6 @@ stages:
     dependsOn:
       - Tests
       - Quality
-      - ManualApproval
     condition: always()
     jobs:
       - job: AuditJob
@@ -155,8 +154,11 @@ stages:
 
   - stage: Deploy
     displayName: Deploy to Production (K8s) + Policy Fix (simulated)
-    dependsOn: Audit
-    condition: succeeded()
+    dependsOn: 
+    - Audit
+    - Tests
+    - Quality 
+    condition: and(succeeded('Tests'), succeeded('Quality'), succeeded('Audit'))
     jobs:
       - job: DeployJob
         displayName: Deploy Job
