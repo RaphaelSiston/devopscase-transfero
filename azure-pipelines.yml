@@ -5,7 +5,8 @@ trigger:
 
 variables:
   - name: vmPool
-    value: self-hosted
+    value: self-hosted 
+
 
   # K8s / DAST (simulados)
   - name: K8S_NAMESPACE
