@@ -4,6 +4,8 @@ trigger:
       - main
 
 variables:
+  - name: FORCE_FAIL_TESTS
+    value: "false"
   - name: K8S_MANIFEST
     value: "k8s/deployment.yml"
   - name: K8S_NAMESPACE
