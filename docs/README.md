@@ -1,8 +1,5 @@
-# 1. Visão Geral
-# Este documento descreve a arquitetura, decisões técnicas e boas práticas adotadas no desenvolvimento do case técnico para a vaga de DevOps Engineer Pleno. O objetivo principal foi demonstrar a aplicação de conceitos modernos de CI/CD, segurança, qualidade de código, Kubernetes, observabilidade e auditoria, alinhados às práticas de mercado.
+# Este documento descreve a arquitetura, decisões técnicas e boas práticas adotadas no desenvolvimento para práticas devops. 
 
-
-# 2. Arquitetura da Solução
 # A solução foi estruturada com base nos seguintes pilares:
 
 # - Azure DevOps: Orquestração de CI/CD, controle de pipelines e aprovações
@@ -22,10 +19,10 @@
 # - Geração de relatórios e auditoria
 
 
-# 3. Pipeline CI/CD no Azure DevOps
-# A pipeline foi construída em formato YAML, promovendo versionamento, reutilização e rastreabilidade.
+# Pipeline CI/CD no Azure DevOps
+# A pipeline promovendo versionamento, reutilização e rastreabilidade.
 
-# - 3.1 Estágios da Pipeline
+# Estágios da Pipeline
 # - Build: Compilação e validação inicial da aplicação
 # - Tests: Execução de testes unitários, integração e carga
 # - Quality: Análise de qualidade do código com SonarCloud
@@ -36,8 +33,9 @@
 # - Essa separação garante isolamento de responsabilidades e facilita auditorias.
 
 
-# 4. Governança de Qualidade de Código – SonarCloud
-# O SonarCloud foi integrado à pipeline para aplicar Quality Gates, impedindo que código com problemas de qualidade chegue à produção.
+# Governança de Qualidade de Código – SonarCloud
+# O SonarCloud foi integrado à pipeline para aplicar Quality Gates, impedindo que código tenhas problemas de qualidade.
+
 # Métricas monitoradas:
 
 # - Cobertura mínima de testes
@@ -48,9 +46,9 @@
 # - Relatórios de qualidade ficam disponíveis via dashboard do SonarCloud e vinculados à execução da pipeline no Azure DevOps.
 
 
-# 5. Segurança – DAST com OWASP ZAP
-# Foi implementada uma etapa de Dynamic Application Security Testing (DAST) utilizando o OWASP ZAP.
-# Estratégia adotada:
+# Segurança – DAST com OWASP ZAP
+# Foi implementada para o teste da aplicação : 
+
 # - Execução automatizada durante a pipeline
 # - arredura de vulnerabilidades em aplicações web e APIs
 # - Classificação por severidade
@@ -58,23 +56,23 @@
 # - Os relatórios de segurança são gerados em formato HTML e publicados como artifacts no Azure DevOps, além de estarem prontos para integração com sistemas de alerta.
 
 
-# 6. Kubernetes – Correções Automáticas e Governança
+# Kubernetes – Correções Automáticas e Governança
 
-# 6.1 Escalabilidade com HPA
+# Escalabilidade com HPA
 # Foi configurado o Horizontal Pod Autoscaler (HPA) com os seguintes limites:
 # - Réplicas mínimas: 3
 # - Réplicas máximas: 6
 # - Escalabilidade baseada no uso de CPU
 # - Essa abordagem garante alta disponibilidade e uso eficiente de recursos.
 
-# 6.2 Limites de Recursos
+# Limites de Recursos
 # - Cada pod possui limites definidos de:
 
 # - CPU: até 4 cores
 # - Memória: até 8 GB
 # - Esses limites evitam consumo excessivo e garantem estabilidade do cluster.
 
-# 6.3 Script de Correção Automática (Policy as Code)
+# Script de Correção Automática (Policy as Code)
 # - Foi desenvolvido um script automatizado responsável por:
 
 # - Validar configurações de réplicas
@@ -83,7 +81,7 @@
 # - Esse conceito reforça a prática de Policy as Code, reduzindo erros manuais e garantindo compliance contínuo.
 
 
-# 7. Monitoramento, Métricas e Logs
+# Monitoramento, Métricas e Logs
 # A solução prevê integração com Azure Monitor / Container Insights, permitindo:
 
 # - Monitoramento de CPU, memória e número de réplicas
@@ -98,7 +96,7 @@
 # - Essa abordagem garante observabilidade desde o deploy, facilitando troubleshooting e resposta a incidentes.
 
 
-# 8. Auditoria e Relatórios
+# Auditoria e Relatórios
 # Cada execução da pipeline gera:
 
 # - Relatório de conformidade de testes
@@ -106,14 +104,3 @@
 # - Relatório de segurança (DAST)
 # - Logs detalhados de correções automáticas
 # - Esses dados permitem rastreabilidade completa e atendem requisitos de auditoria e compliance.
-
-
-# 9. Considerações Finais
-# Este case foi desenvolvido com foco em:
-
-# - Automação
-# - Segurança desde o início (Shift Left Security)
-# - Qualidade contínua
-# - Governança e auditoria
-# - Boas práticas de DevOps e SRE
-# - A arquitetura proposta é escalável, segura e alinhada aos padrões utilizados em ambientes corporativos modernos.

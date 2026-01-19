@@ -1,1 +1,0 @@
-# devopscase-transfero ce
